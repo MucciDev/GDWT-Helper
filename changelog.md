@@ -1,5 +1,8 @@
 # Changelog
 
+## v1.0.1
+* Added logo (W LunarSpark)
+
 ## v1.0.0
 * Initial release.
 * Added GDWT configuration popup to LevelInfoLayer.
