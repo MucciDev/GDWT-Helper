@@ -1,14 +1,15 @@
 {
-	"geode": "5.0.1",
-	"gd": {
-		"win": "2.2081"
-	},
-	"id": "akamelom.gdwt-helper",
-	"name": "GDWT Helper",
-	"version": "v1.0.1",
-	"developer": "akaMelom",
-	"description": "Helps simulate GDWT sessions",
-	"dependencies": {
-		"geode.node-ids": ">=v1.20.0"
-	}
+    "geode": "5.0.1",
+    "gd": {
+        "win": "2.2081"
+    },
+    "id": "akamelom.gdwt-helper",
+    "name": "GDWT Helper",
+    "version": "v1.0.1",
+    "developer": "akaMelom",
+    "description": "Helps simulate GDWT sessions",
+    "tags": [ "utility", "interface", "enhancement" ],
+    "dependencies": {
+        "geode.node-ids": ">=v1.20.0"
+    }
 }
