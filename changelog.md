@@ -1,5 +1,8 @@
 # Changelog
 
+## v1.0.2
+* Added tags
+
 ## v1.0.1
 * Added logo (W LunarSpark)
 
