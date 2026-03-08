@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.1.0
+* Changed file path generation to segregate stats and logs into subfolders based on the specific Level ID/Name.
+* Fixed Cocos2d-x text truncation bug in the Session Viewer by removing manual setWidth and relying on automatic newlines.
+* Replaced std::string casting with .generic_string() for filesystem paths to prevent crashes and comply with Geode Index guidelines.
+
 ## v1.0.2
 * Added tags
 
