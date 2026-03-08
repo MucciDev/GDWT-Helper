@@ -5,7 +5,7 @@
     },
     "id": "akamelom.gdwt-helper",
     "name": "GDWT Helper",
-    "version": "v1.0.2",
+    "version": "v1.1.0",
     "developer": "akaMelom",
     "description": "Helps simulate GDWT sessions",
     "tags": [ "utility", "interface", "enhancement" ],
@@ -13,4 +13,3 @@
         "geode.node-ids": ">=v1.20.0"
     }
 }
-
