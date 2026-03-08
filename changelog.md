@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.1.2
+* Replaced standard path string conversions with `geode::utils::pathToString()` to prevent crashes.
+* Implemented `std::error_code` handling for directory creation to ensure the mod never throws C++ exceptions.
+* Reinforced the use of `geode::utils::numFromString` with safe fallbacks to parse user input without risk of crashes.
+
 ## v1.1.1
 * Added GitHub repository link to mod.json.
 * Set up automated GitHub Actions release workflow.

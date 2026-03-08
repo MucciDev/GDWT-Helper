@@ -4,6 +4,7 @@
 #include <Geode/ui/TextInput.hpp>
 #include <Geode/ui/Popup.hpp>
 #include <Geode/ui/ScrollLayer.hpp>
+#include <Geode/utils/string.hpp>
 #include <vector>
 #include <string>
 #include <fstream>
@@ -13,6 +14,7 @@
 #include <sstream>
 #include <filesystem>
 #include <algorithm>
+#include <system_error>
 
 using namespace geode::prelude;
 
@@ -97,11 +99,14 @@ void processSessionEnd() {
     if (pctString.empty()) pctString = "No valid runs completed.";
 
     auto configDir = geode::Mod::get()->getConfigDir() / g_state.currentLevelKey;
-    std::filesystem::create_directories(configDir);
+    
+    // FIX: Use std::error_code to avoid exceptions
+    std::error_code ec;
+    std::filesystem::create_directories(configDir, ec);
     
     std::string dateStr = getCurrentDateString();
-
     auto runPath = configDir / fmt::format("Simulation_{}.txt", dateStr);
+
     std::ofstream runFile(runPath);
     if (runFile.is_open()) {
         runFile << "GDWT Simulation - " << dateStr << "\n";
@@ -256,8 +261,8 @@ protected:
         auto configDir = geode::Mod::get()->getConfigDir() / g_state.currentLevelKey;
         if (std::filesystem::exists(configDir)) {
             for (const auto& entry : std::filesystem::directory_iterator(configDir)) {
-                // FIX: Use generic_string() to safely read file names on all operating systems
-                std::string filename = entry.path().filename().generic_string();
+                // FIX: Use geode::utils::string::pathToString
+                std::string filename = geode::utils::string::pathToString(entry.path().filename());
                 if (filename.find("Simulation_") != std::string::npos) {
                     m_files.push_back(entry.path()); // Store path safely
                 }
@@ -286,7 +291,7 @@ protected:
         }
 
         formatScrollText();
-        m_pageLabel->setString(fmt::format("{} / {}", m_currentIndex + 1, m_files.size()).c_str());
+        m_pageLabel->setString(fmt::format("{} / {}", m_currentIndex + 1, (int)m_files.size()).c_str());
     }
 
     void formatScrollText() {
@@ -396,9 +401,11 @@ protected:
     }
 
     void onStart(CCObject*) {
+        // FIX: Use numFromString instead of std::stoi/stof
+        // Safe unwrapOr handles errors without crashing
         float timeMin = utils::numFromString<float>(m_timeInput->getString()).unwrapOr(30.0f);
-        g_state.qualifyPct = utils::numFromString<float>(m_qualInput->getString()).unwrapOr(32.0f);
-        g_state.p15Pct = utils::numFromString<float>(m_15Input->getString()).unwrapOr(54.0f);
+        g_state.qualifyPct = utils::numFromString<float>(m_qualInput->getString()).unwrapOr(25.0f);
+        g_state.p15Pct = utils::numFromString<float>(m_15Input->getString()).unwrapOr(50.0f);
         g_state.p20Pct = utils::numFromString<float>(m_20Input->getString()).unwrapOr(75.0f);
 
         g_state.sessionDurationMinutes = timeMin;
