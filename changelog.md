@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.1.1
+* Added GitHub repository link to mod.json.
+* Set up automated GitHub Actions release workflow.
+
 ## v1.1.0
 * Changed file path generation to segregate stats and logs into subfolders based on the specific Level ID/Name.
 * Fixed Cocos2d-x text truncation bug in the Session Viewer by removing manual setWidth and relying on automatic newlines.
