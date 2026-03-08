@@ -19,3 +19,5 @@ This mod allows you to configure custom time limits and percentage thresholds to
 2. Enter your desired time limit and percentage thresholds.
 3. Click **Ready**.
 4. Play the level! The timer and point tracking will begin automatically as soon as you spawn in.
+
+### Logo by LunarSpark (GOAT)
