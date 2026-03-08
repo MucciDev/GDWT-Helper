@@ -8,6 +8,7 @@
     "version": "v1.1.0",
     "developer": "akaMelom",
     "description": "Helps simulate GDWT sessions",
+    "repository": "https://github.com/MucciDev/GDWT-Helper",
     "tags": [ "utility", "interface", "enhancement" ],
     "dependencies": {
         "geode.node-ids": ">=v1.20.0"
