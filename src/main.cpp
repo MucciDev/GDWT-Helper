@@ -22,12 +22,16 @@ struct GDWTState {
     bool isActive = false;
     bool timeExpired = false; 
     
+    // Level Identification
+    std::string currentLevelKey = "Unknown";
+    std::string currentLevelName = "Level";
+
     float timeRemaining = 0.0f; 
     float timeElapsed = 0.0f; 
     float sessionDurationMinutes = 0.0f;
     
-    float qualifyPct = 25.0f;
-    float p15Pct = 50.0f;
+    float qualifyPct = 32.0f;
+    float p15Pct = 54.0f;
     float p20Pct = 75.0f;
     
     float totalPoints = 0.0f; 
@@ -53,7 +57,7 @@ std::string getCurrentDateString() {
 }
 
 void loadGlobalStats() {
-    auto configDir = geode::Mod::get()->getConfigDir();
+    auto configDir = geode::Mod::get()->getConfigDir() / g_state.currentLevelKey;
     auto statsPath = configDir / "stats.txt";
     float bestPPM = 0.0f, totalPts = 0.0f, totalMins = 0.0f;
 
@@ -92,7 +96,7 @@ void processSessionEnd() {
     }
     if (pctString.empty()) pctString = "No valid runs completed.";
 
-    auto configDir = geode::Mod::get()->getConfigDir();
+    auto configDir = geode::Mod::get()->getConfigDir() / g_state.currentLevelKey;
     std::filesystem::create_directories(configDir);
     
     std::string dateStr = getCurrentDateString();
@@ -101,6 +105,7 @@ void processSessionEnd() {
     std::ofstream runFile(runPath);
     if (runFile.is_open()) {
         runFile << "GDWT Simulation - " << dateStr << "\n";
+        runFile << "Level: " << g_state.currentLevelName << "\n";
         runFile << "--------------------------------\n";
         runFile << "Total Points: " << std::fixed << std::setprecision(1) << g_state.totalPoints << "\n";
         runFile << "Pace: " << std::fixed << std::setprecision(1) << finalPPM << " PPM\n";
@@ -149,7 +154,11 @@ class GDWTStatsPopup : public geode::Popup {
 protected:
     bool init() {
         if (!Popup::init(290.f, 180.f)) return false;
-        this->setTitle("Lifetime Pace");
+        
+        std::string title = g_state.currentLevelName.length() > 15 
+            ? "Level Stats" 
+            : fmt::format("{} Stats", g_state.currentLevelName);
+        this->setTitle(title.c_str());
 
         loadGlobalStats();
 
@@ -185,7 +194,8 @@ public:
 // --- UI: Session History Viewer ---
 class GDWTSessionViewer : public geode::Popup {
 protected:
-    std::vector<std::string> m_files;
+    // FIX: Using filesystem::path directly instead of strings
+    std::vector<std::filesystem::path> m_files;
     int m_currentIndex = 0;
     geode::ScrollLayer* m_scrollLayer;
     CCLabelBMFont* m_contentLabel;
@@ -210,7 +220,6 @@ protected:
 
         m_contentLabel = CCLabelBMFont::create("", "chatFont.fnt");
         m_contentLabel->setAlignment(CCTextAlignment::kCCTextAlignmentCenter);
-        m_contentLabel->setWidth(280.0f / 0.5f); 
         m_scrollLayer->m_contentLayer->addChild(m_contentLabel);
 
         auto menu = CCMenu::create();
@@ -244,12 +253,13 @@ protected:
     }
 
     void loadFiles() {
-        auto configDir = geode::Mod::get()->getConfigDir();
+        auto configDir = geode::Mod::get()->getConfigDir() / g_state.currentLevelKey;
         if (std::filesystem::exists(configDir)) {
             for (const auto& entry : std::filesystem::directory_iterator(configDir)) {
-                std::string filename = entry.path().filename().string();
+                // FIX: Use generic_string() to safely read file names on all operating systems
+                std::string filename = entry.path().filename().generic_string();
                 if (filename.find("Simulation_") != std::string::npos) {
-                    m_files.push_back(entry.path().string());
+                    m_files.push_back(entry.path()); // Store path safely
                 }
             }
         }
@@ -284,10 +294,10 @@ protected:
         m_contentLabel->updateLabel(); 
         
         float labelHeight = m_contentLabel->getContentSize().height * 0.5f;
-        float layerHeight = std::max(160.0f, labelHeight + 10.0f);
+        float layerHeight = std::max(160.0f, labelHeight + 25.0f); 
         
         m_scrollLayer->m_contentLayer->setContentSize({300.0f, layerHeight});
-        m_contentLabel->setPosition({150.0f, layerHeight - 5.0f});
+        m_contentLabel->setPosition({150.0f, layerHeight - 10.0f});
         m_contentLabel->setAnchorPoint({0.5f, 1.0f});
         
         m_scrollLayer->moveToTop();
@@ -316,7 +326,7 @@ public:
     }
 };
 
-// --- UI: Configuration Popup (FIXED BUTTON ALIGNMENT) ---
+// --- UI: Configuration Popup ---
 class GDWTPopup : public geode::Popup { 
 protected:
     TextInput* m_timeInput;
@@ -327,9 +337,8 @@ protected:
     bool init() { 
         if (!Popup::init(260.0f, 290.0f)) return false; 
 
-        this->setTitle("Setup Simulation");
+        this->setTitle("Configure GDWT");
 
-        // 1. INPUT BOXES (Top Half)
         auto inputMenu = CCMenu::create();
         inputMenu->setLayout(ColumnLayout::create()->setGap(4.0f)->setAxisReverse(true));
         inputMenu->setPosition({ m_mainLayer->getContentSize().width / 2, m_mainLayer->getContentSize().height / 2 + 25.0f });
@@ -353,8 +362,6 @@ protected:
         inputMenu->updateLayout();
         m_mainLayer->addChild(inputMenu);
 
-
-        // 2. BUTTONS: Sessions and Pace (Side-by-Side)
         auto topBtnMenu = CCMenu::create();
         topBtnMenu->setLayout(RowLayout::create()->setGap(8.0f));
         topBtnMenu->setPosition({ m_mainLayer->getContentSize().width / 2, 65.0f });
@@ -374,8 +381,6 @@ protected:
         topBtnMenu->updateLayout();
         m_mainLayer->addChild(topBtnMenu);
 
-
-        // 3. BUTTONS: Ready (Centered below)
         auto bottomBtnMenu = CCMenu::create();
         bottomBtnMenu->setPosition({ m_mainLayer->getContentSize().width / 2, 30.0f });
 
@@ -427,7 +432,7 @@ public:
     }
 };
 
-// --- Level Info Screen Hook (Pre-Play Menu) ---
+// --- Level Info Screen Hook ---
 class $modify(MyLevelInfoLayer, LevelInfoLayer) {
     bool init(GJGameLevel* level, bool challenge) {
         if (!LevelInfoLayer::init(level, challenge)) return false;
@@ -445,7 +450,21 @@ class $modify(MyLevelInfoLayer, LevelInfoLayer) {
         return true;
     }
 
-    void onGDWTPopup(CCObject*) { GDWTPopup::create()->show(); }
+    void onGDWTPopup(CCObject*) { 
+        g_state.currentLevelName = this->m_level->m_levelName;
+        int id = this->m_level->m_levelID.value();
+        
+        std::string cleanName = "";
+        for (char c : g_state.currentLevelName) {
+            if (isalnum(c) || c == '-' || c == '_') cleanName += c;
+            else if (c == ' ') cleanName += "_";
+        }
+        
+        if (id > 0) g_state.currentLevelKey = fmt::format("{}_{}", id, cleanName);
+        else g_state.currentLevelKey = cleanName.empty() ? "Local_Level" : cleanName;
+
+        GDWTPopup::create()->show(); 
+    }
 };
 
 // --- Gameplay Hook ---
