@@ -22,6 +22,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Build the mod
         uses: geode-sdk/build-geode-mod@main
@@ -35,6 +37,10 @@ jobs:
     needs: ['build']
 
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - uses: geode-sdk/build-geode-mod/combine@main
         id: build
 
@@ -43,13 +49,48 @@ jobs:
           name: Build Output
           path: ${{ steps.build.outputs.build-output }}
 
+      - name: Generate Release Info
+        id: release_info
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            # Official Release triggered by pushing a tag
+            echo "IS_PRERELEASE=false" >> $GITHUB_OUTPUT
+            echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+            echo "RELEASE_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            # Pre-release triggered by pushing code
+            VERSION=$(jq -r .version mod.json)
+            
+            # Count commits since the last official tag
+            LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || git rev-list --max-parents=0 HEAD)
+            COMMIT_COUNT=$(git rev-list ${LAST_TAG}..HEAD --count)
+            
+            if [ "$COMMIT_COUNT" -eq 0 ]; then COMMIT_COUNT=1; fi
+            
+            # Convert commit count to a letter (1=a, 2=b... 27=aa)
+            SUFFIX=$(python3 -c "
+            n = int('$COMMIT_COUNT')
+            s = ''
+            while n > 0:
+                n -= 1
+                s = chr(97 + (n % 26)) + s
+                n //= 26
+            print(s)
+            ")
+            
+            TAG_NAME="v${VERSION}${SUFFIX}"
+            echo "IS_PRERELEASE=true" >> $GITHUB_OUTPUT
+            echo "TAG_NAME=${TAG_NAME}" >> $GITHUB_OUTPUT
+            echo "RELEASE_NAME=${TAG_NAME} (Pre-release)" >> $GITHUB_OUTPUT
+          fi
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
         with:
           files: ${{ steps.build.outputs.build-output }}/*.geode
-          name: ${{ github.ref_name }}
+          tag_name: ${{ steps.release_info.outputs.TAG_NAME }}
+          name: ${{ steps.release_info.outputs.RELEASE_NAME }}
           draft: false
-          prerelease: false
+          prerelease: ${{ steps.release_info.outputs.IS_PRERELEASE == 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
