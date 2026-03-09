@@ -53,7 +53,6 @@ jobs:
         id: release_info
         run: |
           if [[ $GITHUB_REF == refs/tags/* ]]; then
-            # Official Release triggered by pushing a tag
             echo "IS_PRERELEASE=false" >> $GITHUB_OUTPUT
             echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
             echo "RELEASE_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
@@ -68,16 +67,15 @@ jobs:
             
             if [ "$COMMIT_COUNT" -eq 0 ]; then COMMIT_COUNT=1; fi
             
-            # Convert commit count to a letter safely (Python inline)
-            SUFFIX=$(python3 -c "
-n = int('$COMMIT_COUNT')
-s = ''
-while n > 0:
-    n -= 1
-    s = chr(97 + (n % 26)) + s
-    n //= 26
-print(s)
-")
+            n=$COMMIT_COUNT
+            SUFFIX=""
+            while [ $n -gt 0 ]; do
+              n=$((n-1))
+              rem=$((n%26))
+              char=$(printf \\$(printf "%03o" $((rem + 97))))
+              SUFFIX="${char}${SUFFIX}"
+              n=$((n/26))
+            done
             
             TAG_NAME="v${VERSION}${SUFFIX}"
             echo "IS_PRERELEASE=true" >> $GITHUB_OUTPUT
