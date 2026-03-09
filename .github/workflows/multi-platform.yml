@@ -59,7 +59,8 @@ jobs:
             echo "RELEASE_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
           else
             # Pre-release triggered by pushing code
-            VERSION=$(jq -r .version mod.json)
+            RAW_VERSION=$(jq -r .version mod.json)
+            VERSION=${RAW_VERSION#v}
             
             # Count commits since the last official tag
             LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || git rev-list --max-parents=0 HEAD)
@@ -67,16 +68,16 @@ jobs:
             
             if [ "$COMMIT_COUNT" -eq 0 ]; then COMMIT_COUNT=1; fi
             
-            # Convert commit count to a letter (1=a, 2=b... 27=aa)
+            # Convert commit count to a letter safely (Python inline)
             SUFFIX=$(python3 -c "
-            n = int('$COMMIT_COUNT')
-            s = ''
-            while n > 0:
-                n -= 1
-                s = chr(97 + (n % 26)) + s
-                n //= 26
-            print(s)
-            ")
+n = int('$COMMIT_COUNT')
+s = ''
+while n > 0:
+    n -= 1
+    s = chr(97 + (n % 26)) + s
+    n //= 26
+print(s)
+")
             
             TAG_NAME="v${VERSION}${SUFFIX}"
             echo "IS_PRERELEASE=true" >> $GITHUB_OUTPUT
