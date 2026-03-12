@@ -25,8 +25,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Build the mod
         uses: geode-sdk/build-geode-mod@main
@@ -40,10 +38,6 @@ jobs:
     needs: ['build']
 
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
       - uses: geode-sdk/build-geode-mod/combine@main
         id: build
 
@@ -52,47 +46,13 @@ jobs:
           name: Build Output
           path: ${{ steps.build.outputs.build-output }}
 
-      - name: Generate Release Info
-        id: release_info
-        run: |
-          if [[ $GITHUB_REF == refs/tags/* ]]; then
-            echo "IS_PRERELEASE=false" >> $GITHUB_OUTPUT
-            echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-            echo "RELEASE_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-          else
-            # Pre-release triggered by pushing code
-            RAW_VERSION=$(jq -r .version mod.json)
-            VERSION=${RAW_VERSION#v}
-            
-            # Count commits since the last official tag
-            LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || git rev-list --max-parents=0 HEAD)
-            COMMIT_COUNT=$(git rev-list ${LAST_TAG}..HEAD --count)
-            
-            if [ "$COMMIT_COUNT" -eq 0 ]; then COMMIT_COUNT=1; fi
-            
-            n=$COMMIT_COUNT
-            SUFFIX=""
-            while [ $n -gt 0 ]; do
-              n=$((n-1))
-              rem=$((n%26))
-              char=$(printf \\$(printf "%03o" $((rem + 97))))
-              SUFFIX="${char}${SUFFIX}"
-              n=$((n/26))
-            done
-            
-            TAG_NAME="v${VERSION}${SUFFIX}"
-            echo "IS_PRERELEASE=true" >> $GITHUB_OUTPUT
-            echo "TAG_NAME=${TAG_NAME}" >> $GITHUB_OUTPUT
-            echo "RELEASE_NAME=${TAG_NAME} (Pre-release)" >> $GITHUB_OUTPUT
-          fi
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
         with:
           files: ${{ steps.build.outputs.build-output }}/*.geode
-          tag_name: ${{ steps.release_info.outputs.TAG_NAME }}
-          name: ${{ steps.release_info.outputs.RELEASE_NAME }}
+          name: ${{ github.ref_name }}
           draft: false
-          prerelease: ${{ steps.release_info.outputs.IS_PRERELEASE == 'true' }}
+          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
