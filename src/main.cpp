@@ -5,6 +5,7 @@
 #include <Geode/ui/Popup.hpp>
 #include <Geode/ui/ScrollLayer.hpp>
 #include <Geode/utils/string.hpp>
+
 #include <vector>
 #include <string>
 #include <fstream>
@@ -18,30 +19,39 @@
 
 using namespace geode::prelude;
 
+// --- Constants ---
+constexpr float POINTS_FOR_COMPLETION = 250.0f;
+constexpr float SECONDS_PER_MINUTE = 60.0f;
+constexpr float DEFAULT_TIMER_MINUTES = 30.0f;
+
 // --- Global State ---
 struct GDWTState {
     bool isPendingStart = false; 
     bool isActive = false;
     bool timeExpired = false; 
     
-    // Level Identification
+    // Level identification
     std::string currentLevelKey = "Unknown";
     std::string currentLevelName = "Level";
 
+    // Session timers
     float timeRemaining = 0.0f; 
     float timeElapsed = 0.0f; 
     float sessionDurationMinutes = 0.0f;
     
-    float qualifyPct = 32.0f;
-    float p15Pct = 54.0f;
+    // Scoring thresholds
+    float qualifyPct = 25.0f;
+    float p15Pct = 50.0f;
     float p20Pct = 75.0f;
     
+    // Session stats
     float totalPoints = 0.0f; 
     float currentPPM = 0.0f;
     std::vector<int> allPercentages;
     int currentStreakCompletions = 0;
     int bestStreakPct = 0;
 
+    // Lifetime stats
     float globalBestPPM = 0.0f;
     float globalAvgPPM = 0.0f;
     float globalTotalMins = 0.0f;
@@ -50,17 +60,21 @@ struct GDWTState {
 inline GDWTState g_state;
 
 // --- Helpers ---
+
+// Generates a timestamp string formatted for file naming
 std::string getCurrentDateString() {
-    auto now = std::chrono::system_clock::now();
-    std::time_t now_c = std::chrono::system_clock::to_time_t(now);
+    const auto now = std::chrono::system_clock::now();
+    const std::time_t now_c = std::chrono::system_clock::to_time_t(now);
     std::stringstream ss;
     ss << std::put_time(std::localtime(&now_c), "%Y-%m-%d_%H-%M-%S");
     return ss.str();
 }
 
+// Reads lifetime stats from the level's config directory
 void loadGlobalStats() {
-    auto configDir = geode::Mod::get()->getConfigDir() / g_state.currentLevelKey;
-    auto statsPath = configDir / "stats.txt";
+    const auto configDir = geode::Mod::get()->getConfigDir() / g_state.currentLevelKey;
+    const auto statsPath = configDir / "stats.txt";
+    
     float bestPPM = 0.0f, totalPts = 0.0f, totalMins = 0.0f;
 
     std::ifstream inFile(statsPath);
@@ -74,20 +88,23 @@ void loadGlobalStats() {
     g_state.globalAvgPPM = (totalMins > 0.0f) ? (totalPts / totalMins) : 0.0f;
 }
 
+// Calculates points earned based on run percentage
 float calculatePoints(float pct) {
-    if (pct >= 100.0f) return 250.0f; 
+    if (pct >= 100.0f) return POINTS_FOR_COMPLETION; 
     if (pct >= g_state.p20Pct) return pct * 2.0f;
     if (pct >= g_state.p15Pct) return pct * 1.5f;
     if (pct >= g_state.qualifyPct) return pct;
     return 0.0f;
 }
 
+// Finalizes session, saves logs, and updates lifetime statistics
 void processSessionEnd() {
     g_state.isActive = false; 
 
-    float elapsedMins = g_state.timeElapsed / 60.0f;
-    float finalPPM = (elapsedMins > 0.0f) ? (g_state.totalPoints / elapsedMins) : 0.0f;
+    const float elapsedMins = g_state.timeElapsed / SECONDS_PER_MINUTE;
+    const float finalPPM = (elapsedMins > 0.0f) ? (g_state.totalPoints / elapsedMins) : 0.0f;
 
+    // Format run history string
     std::string pctString = "";
     for (size_t i = 0; i < g_state.allPercentages.size(); ++i) {
         pctString += std::to_string(g_state.allPercentages[i]) + "%";
@@ -98,14 +115,15 @@ void processSessionEnd() {
     }
     if (pctString.empty()) pctString = "No valid runs completed.";
 
-    auto configDir = geode::Mod::get()->getConfigDir() / g_state.currentLevelKey;
+    const auto configDir = geode::Mod::get()->getConfigDir() / g_state.currentLevelKey;
     
-    // FIX: Use std::error_code to avoid exceptions
+    // Ensure directory exists without throwing exceptions
     std::error_code ec;
     std::filesystem::create_directories(configDir, ec);
     
-    std::string dateStr = getCurrentDateString();
-    auto runPath = configDir / fmt::format("Simulation_{}.txt", dateStr);
+    // Save current session log
+    const std::string dateStr = getCurrentDateString();
+    const auto runPath = configDir / fmt::format("Simulation_{}.txt", dateStr);
 
     std::ofstream runFile(runPath);
     if (runFile.is_open()) {
@@ -121,29 +139,34 @@ void processSessionEnd() {
         runFile.close();
     }
 
+    // Read existing lifetime stats to append new data
     float bestPPM = 0.0f, totalHistoricalPts = 0.0f, totalHistoricalMins = 0.0f;
-    auto statsPath = configDir / "stats.txt";
+    const auto statsPath = configDir / "stats.txt";
+    
     std::ifstream inFile(statsPath);
     if (inFile.is_open()) {
         inFile >> bestPPM >> totalHistoricalPts >> totalHistoricalMins;
         inFile.close();
     }
+    
     if (finalPPM > bestPPM) bestPPM = finalPPM;
     totalHistoricalPts += g_state.totalPoints;
     totalHistoricalMins += elapsedMins;
 
+    // Overwrite with updated lifetime stats
     std::ofstream outFile(statsPath);
     if (outFile.is_open()) {
         outFile << bestPPM << " " << totalHistoricalPts << " " << totalHistoricalMins;
         outFile.close();
     }
 
+    // Format output for UI alert
     std::string uiPctString = pctString;
     if (uiPctString.length() > 80) {
         uiPctString = uiPctString.substr(0, 77) + "...";
     }
 
-    auto msg = fmt::format(
+    const auto msg = fmt::format(
         "Total Points: {:.1f}\nPace: {:.1f} PPM\nBest Streak: {}%\n\nLog saved to config folder!\n\nHistory:\n{}", 
         g_state.totalPoints, 
         finalPPM,
@@ -155,12 +178,14 @@ void processSessionEnd() {
 }
 
 // --- UI: Global Stats ---
+
+// Displays lifetime pace and playtime for the current level
 class GDWTStatsPopup : public geode::Popup {
 protected:
     bool init() {
         if (!Popup::init(290.f, 180.f)) return false;
         
-        std::string title = g_state.currentLevelName.length() > 15 
+        const std::string title = g_state.currentLevelName.length() > 15 
             ? "Level Stats" 
             : fmt::format("{} Stats", g_state.currentLevelName);
         this->setTitle(title.c_str());
@@ -197,11 +222,13 @@ public:
 };
 
 // --- UI: Session History Viewer ---
+
+// Iterates through saved session logs and displays them in-game
 class GDWTSessionViewer : public geode::Popup {
 protected:
-    // FIX: Using filesystem::path directly instead of strings
     std::vector<std::filesystem::path> m_files;
     int m_currentIndex = 0;
+    
     geode::ScrollLayer* m_scrollLayer;
     CCLabelBMFont* m_contentLabel;
     CCLabelBMFont* m_pageLabel;
@@ -258,13 +285,13 @@ protected:
     }
 
     void loadFiles() {
-        auto configDir = geode::Mod::get()->getConfigDir() / g_state.currentLevelKey;
+        const auto configDir = geode::Mod::get()->getConfigDir() / g_state.currentLevelKey;
+        
         if (std::filesystem::exists(configDir)) {
             for (const auto& entry : std::filesystem::directory_iterator(configDir)) {
-                // FIX: Use geode::utils::string::pathToString
                 std::string filename = geode::utils::string::pathToString(entry.path().filename());
                 if (filename.find("Simulation_") != std::string::npos) {
-                    m_files.push_back(entry.path()); // Store path safely
+                    m_files.push_back(entry.path()); 
                 }
             }
         }
@@ -298,8 +325,8 @@ protected:
         m_contentLabel->setScale(0.5f); 
         m_contentLabel->updateLabel(); 
         
-        float labelHeight = m_contentLabel->getContentSize().height * 0.5f;
-        float layerHeight = std::max(160.0f, labelHeight + 25.0f); 
+        const float labelHeight = m_contentLabel->getContentSize().height * 0.5f;
+        const float layerHeight = std::max(160.0f, labelHeight + 25.0f); 
         
         m_scrollLayer->m_contentLayer->setContentSize({300.0f, layerHeight});
         m_contentLabel->setPosition({150.0f, layerHeight - 10.0f});
@@ -332,6 +359,8 @@ public:
 };
 
 // --- UI: Configuration Popup ---
+
+// Interface for initializing session rules and starting the timer
 class GDWTPopup : public geode::Popup { 
 protected:
     TextInput* m_timeInput;
@@ -341,7 +370,6 @@ protected:
 
     bool init() { 
         if (!Popup::init(260.0f, 290.0f)) return false; 
-
         this->setTitle("Configure GDWT");
 
         auto inputMenu = CCMenu::create();
@@ -401,15 +429,13 @@ protected:
     }
 
     void onStart(CCObject*) {
-        // FIX: Use numFromString instead of std::stoi/stof
-        // Safe unwrapOr handles errors without crashing
-        float timeMin = utils::numFromString<float>(m_timeInput->getString()).unwrapOr(30.0f);
+        // Reset state and apply inputs
+        g_state.sessionDurationMinutes = utils::numFromString<float>(m_timeInput->getString()).unwrapOr(DEFAULT_TIMER_MINUTES);
         g_state.qualifyPct = utils::numFromString<float>(m_qualInput->getString()).unwrapOr(25.0f);
         g_state.p15Pct = utils::numFromString<float>(m_15Input->getString()).unwrapOr(50.0f);
         g_state.p20Pct = utils::numFromString<float>(m_20Input->getString()).unwrapOr(75.0f);
 
-        g_state.sessionDurationMinutes = timeMin;
-        g_state.timeRemaining = timeMin * 60.0f;
+        g_state.timeRemaining = g_state.sessionDurationMinutes * SECONDS_PER_MINUTE;
         g_state.timeElapsed = 0.0f;
         g_state.totalPoints = 0.0f;
         g_state.currentPPM = 0.0f;
@@ -439,7 +465,9 @@ public:
     }
 };
 
-// --- Level Info Screen Hook ---
+// --- Hooks ---
+
+// Injects the GDWT setup button into the level information screen
 class $modify(MyLevelInfoLayer, LevelInfoLayer) {
     bool init(GJGameLevel* level, bool challenge) {
         if (!LevelInfoLayer::init(level, challenge)) return false;
@@ -459,8 +487,9 @@ class $modify(MyLevelInfoLayer, LevelInfoLayer) {
 
     void onGDWTPopup(CCObject*) { 
         g_state.currentLevelName = this->m_level->m_levelName;
-        int id = this->m_level->m_levelID.value();
+        const int id = this->m_level->m_levelID.value();
         
+        // Strip invalid characters for file paths
         std::string cleanName = "";
         for (char c : g_state.currentLevelName) {
             if (isalnum(c) || c == '-' || c == '_') cleanName += c;
@@ -474,7 +503,7 @@ class $modify(MyLevelInfoLayer, LevelInfoLayer) {
     }
 };
 
-// --- Gameplay Hook ---
+// Manages session timer, pace HUD, and run completions during gameplay
 class $modify(MyPlayLayer, PlayLayer) {
     struct Fields {
         CCLabelBMFont* m_gdwtLabel = nullptr;
@@ -491,7 +520,7 @@ class $modify(MyPlayLayer, PlayLayer) {
         }
 
         if (g_state.isActive) {
-            auto winSize = CCDirector::sharedDirector()->getWinSize();
+            const auto winSize = CCDirector::sharedDirector()->getWinSize();
             
             m_fields->m_gdwtLabel = CCLabelBMFont::create("Points: 0 | 0:00", "bigFont.fnt");
             m_fields->m_gdwtLabel->setScale(0.4f);
@@ -522,66 +551,77 @@ class $modify(MyPlayLayer, PlayLayer) {
     void postUpdate(float dt) {
         PlayLayer::postUpdate(dt);
 
-        if (g_state.isActive && !this->m_isPaused) {
-            g_state.timeElapsed += dt; 
+        // Guard clause to prevent updating inactive sessions
+        if (!g_state.isActive || this->m_isPaused) return;
 
-            if (!g_state.timeExpired) {
-                g_state.timeRemaining -= dt;
+        g_state.timeElapsed += dt; 
 
-                if (g_state.timeRemaining <= 0) {
-                    g_state.timeRemaining = 0;
-                    g_state.timeExpired = true; 
-                }
+        if (!g_state.timeExpired) {
+            g_state.timeRemaining -= dt;
+
+            if (g_state.timeRemaining <= 0) {
+                g_state.timeRemaining = 0;
+                g_state.timeExpired = true; 
+            }
+        }
+
+        if (m_fields->m_gdwtLabel && m_fields->m_paceLabel) {
+            const int mins = static_cast<int>(g_state.timeRemaining) / 60;
+            const int secs = static_cast<int>(g_state.timeRemaining) % 60;
+            
+            if (g_state.timeExpired) {
+                m_fields->m_gdwtLabel->setColor({255, 50, 50});
             }
 
-            if (m_fields->m_gdwtLabel && m_fields->m_paceLabel) {
-                int mins = static_cast<int>(g_state.timeRemaining) / 60;
-                int secs = static_cast<int>(g_state.timeRemaining) % 60;
-                
-                if (g_state.timeExpired) {
-                    m_fields->m_gdwtLabel->setColor({255, 50, 50});
-                }
+            m_fields->m_gdwtLabel->setString(
+                fmt::format("GDWT: {:.1f} PTS | {}:{:02}", g_state.totalPoints, mins, secs).c_str()
+            );
+        }
+    }
 
-                m_fields->m_gdwtLabel->setString(
-                    fmt::format("GDWT: {:.1f} PTS | {}:{:02}", g_state.totalPoints, mins, secs).c_str()
-                );
-            }
+    // Consolidated method to calculate and apply points at the end of an attempt
+    void processRunCompletion(int pct) {
+        m_fields->m_hasScoredThisRun = true; 
+        
+        const float pts = calculatePoints(static_cast<float>(pct));
+        g_state.totalPoints += pts; 
+        g_state.allPercentages.push_back(pct);
+        
+        if (pct == 100) {
+            g_state.currentStreakCompletions++;
+        }
+        
+        const int currentStreakScore = (g_state.currentStreakCompletions * 100) + (pct == 100 ? 0 : pct);
+        if (currentStreakScore > g_state.bestStreakPct) {
+            g_state.bestStreakPct = currentStreakScore;
+        }
+
+        if (pct != 100) {
+            g_state.currentStreakCompletions = 0;
+        }
+
+        const float elapsedMins = g_state.timeElapsed / SECONDS_PER_MINUTE;
+        g_state.currentPPM = (elapsedMins > 0.001f) ? (g_state.totalPoints / elapsedMins) : 0.0f;
+        
+        if (m_fields->m_paceLabel) {
+            m_fields->m_paceLabel->setString(
+                fmt::format("Pace: {:.1f} PPM | Avg: {:.1f} | Best: {:.1f}", 
+                    g_state.currentPPM, g_state.globalAvgPPM, g_state.globalBestPPM).c_str()
+            );
+        }
+
+        if (g_state.timeExpired) {
+            processSessionEnd();
+            if (m_fields->m_gdwtLabel) m_fields->m_gdwtLabel->setVisible(false);
+            if (m_fields->m_paceLabel) m_fields->m_paceLabel->setVisible(false);
         }
     }
 
     void destroyPlayer(PlayerObject* p0, GameObject* p1) {
         if (g_state.isActive && !this->m_level->isPlatformer() && !this->m_isPracticeMode && !m_fields->m_hasScoredThisRun) {
-            
-            int pct = static_cast<int>(this->getCurrentPercent());
-            
+            const int pct = static_cast<int>(this->getCurrentPercent());
             if (pct > 0 && pct < 100) {
-                m_fields->m_hasScoredThisRun = true; 
-                
-                float pts = calculatePoints(static_cast<float>(pct));
-                g_state.totalPoints += pts; 
-                
-                g_state.allPercentages.push_back(pct);
-                
-                int currentStreakScore = (g_state.currentStreakCompletions * 100) + pct;
-                if (currentStreakScore > g_state.bestStreakPct) {
-                    g_state.bestStreakPct = currentStreakScore;
-                }
-                g_state.currentStreakCompletions = 0;
-
-                float elapsedMins = g_state.timeElapsed / 60.0f;
-                g_state.currentPPM = (elapsedMins > 0.001f) ? (g_state.totalPoints / elapsedMins) : 0.0f;
-                if (m_fields->m_paceLabel) {
-                    m_fields->m_paceLabel->setString(
-                        fmt::format("Pace: {:.1f} PPM | Avg: {:.1f} | Best: {:.1f}", 
-                            g_state.currentPPM, g_state.globalAvgPPM, g_state.globalBestPPM).c_str()
-                    );
-                }
-
-                if (g_state.timeExpired) {
-                    processSessionEnd();
-                    if (m_fields->m_gdwtLabel) m_fields->m_gdwtLabel->setVisible(false);
-                    if (m_fields->m_paceLabel) m_fields->m_paceLabel->setVisible(false);
-                }
+                this->processRunCompletion(pct);
             }
         }
         PlayLayer::destroyPlayer(p0, p1);
@@ -589,32 +629,7 @@ class $modify(MyPlayLayer, PlayLayer) {
 
     void levelComplete() {
         if (g_state.isActive && !this->m_isPracticeMode && !m_fields->m_hasScoredThisRun) {
-            m_fields->m_hasScoredThisRun = true; 
-            
-            g_state.totalPoints += 250.0f; 
-
-            g_state.allPercentages.push_back(100);
-            g_state.currentStreakCompletions++;
-            
-            int currentStreakScore = g_state.currentStreakCompletions * 100;
-            if (currentStreakScore > g_state.bestStreakPct) {
-                g_state.bestStreakPct = currentStreakScore;
-            }
-
-            float elapsedMins = g_state.timeElapsed / 60.0f;
-            g_state.currentPPM = (elapsedMins > 0.001f) ? (g_state.totalPoints / elapsedMins) : 0.0f;
-            if (m_fields->m_paceLabel) {
-                m_fields->m_paceLabel->setString(
-                    fmt::format("Pace: {:.1f} PPM | Avg: {:.1f} | Best: {:.1f}", 
-                        g_state.currentPPM, g_state.globalAvgPPM, g_state.globalBestPPM).c_str()
-                );
-            }
-
-            if (g_state.timeExpired) {
-                processSessionEnd();
-                if (m_fields->m_gdwtLabel) m_fields->m_gdwtLabel->setVisible(false);
-                if (m_fields->m_paceLabel) m_fields->m_paceLabel->setVisible(false);
-            }
+            this->processRunCompletion(100);
         }
         PlayLayer::levelComplete();
     }
