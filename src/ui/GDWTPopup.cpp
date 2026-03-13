@@ -85,6 +85,7 @@ void GDWTPopup::onStart(CCObject*) {
     g_state.isActive = false;
     g_state.timeExpired = false;
 
+    sendServerPing("start");
     loadGlobalStats();
 
     FLAlertLayer::create("Simulation Ready", "Simulation configured! Hit Play to start.", "OK")->show();

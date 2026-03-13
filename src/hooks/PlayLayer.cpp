@@ -86,6 +86,9 @@ class $modify(MyPlayLayer, PlayLayer) {
         g_state.totalPoints += pts;
         g_state.allPercentages.push_back(pct);
 
+        // SEND THE PING HERE (We use the "crash" action for both deaths and 100% completions so the server logs the run)
+        sendServerPing("crash", pct, pts);
+
         if (pct == 100) {
             g_state.currentStreakCompletions++;
         }

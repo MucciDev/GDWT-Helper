@@ -1,6 +1,14 @@
 # Changelog
 
-* Refactored all of the code
+## v2.0.0
+* Completely replaced the local file-saving system with a real-time HTTP ping system for global leaderboards and remote session tracking.
+* Implemented SHA256 HMAC payload signatures to authenticate incoming percentage runs to the external backend database.
+* Resolved Geode background crash (`c0000005`) by completely redesigning asynchronous networking to use stable, detached `std::thread` tasks.
+* Fixed a gameplay hook issue where completing a level (100%) during an active session would occasionally fail to log the successful run to the server.
+
+## v1.1.3
+* Refactored the entire codebase to deeply implement the strict MVC architectural pattern.
+* Cleanly decoupled all frontend UI components from backend core logic and game hooks, drastically improving project maintainability and performance.
 
 ## v1.1.2
 * Replaced standard path string conversions with `geode::utils::pathToString()` to prevent crashes.
