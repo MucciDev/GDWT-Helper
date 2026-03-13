@@ -1,5 +1,7 @@
 # Changelog
 
+* Refactored all of the code
+
 ## v1.1.2
 * Replaced standard path string conversions with `geode::utils::pathToString()` to prevent crashes.
 * Implemented `std::error_code` handling for directory creation to ensure the mod never throws C++ exceptions.
