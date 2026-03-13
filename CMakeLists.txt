@@ -12,8 +12,10 @@ if(NOT DEFINED ENV{GEODE_SDK})
     message(FATAL_ERROR "GEODE_SDK environment variable is not defined")
 endif()
 
+file(GLOB_RECURSE SOURCES src/*.cpp)
+
 add_library(${PROJECT_NAME} SHARED
-    src/main.cpp
+    ${SOURCES}
 )
 
 add_subdirectory($ENV{GEODE_SDK} ${CMAKE_CURRENT_BINARY_DIR}/geode)
