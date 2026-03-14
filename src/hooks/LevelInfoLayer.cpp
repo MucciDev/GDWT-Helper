@@ -1,6 +1,7 @@
 #include <Geode/modify/LevelInfoLayer.hpp>
 #include "../ui/GDWTPopup.hpp"
 #include "../core/State.hpp"
+#include <cctype>
 
 using namespace geode::prelude;
 
@@ -28,7 +29,10 @@ class $modify(MyLevelInfoLayer, LevelInfoLayer) {
         // Strip invalid characters for file paths
         std::string cleanName = "";
         for (char c : g_state.currentLevelName) {
-            if (isalnum(c) || c == '-' || c == '_') cleanName += c;
+            if (cleanName.size() >= 64) break;
+
+            const auto uc = static_cast<unsigned char>(c);
+            if (std::isalnum(uc) || c == '-' || c == '_') cleanName += c;
             else if (c == ' ') cleanName += "_";
         }
 

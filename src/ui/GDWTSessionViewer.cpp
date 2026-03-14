@@ -62,12 +62,24 @@ bool GDWTSessionViewer::init() {
 
 void GDWTSessionViewer::loadFiles() {
     const auto configDir = geode::Mod::get()->getConfigDir() / g_state.currentLevelKey;
+    std::error_code ec;
+    const auto canonicalConfigDir = std::filesystem::weakly_canonical(configDir, ec);
+    if (ec) return;
 
-    if (std::filesystem::exists(configDir)) {
-        for (const auto& entry : std::filesystem::directory_iterator(configDir)) {
-            std::string filename = geode::utils::string::pathToString(entry.path().filename());
-            if (filename.find("Simulation_") != std::string::npos) {        
-                m_files.push_back(entry.path());
+    if (std::filesystem::exists(configDir, ec) && !ec) {
+        for (const auto& entry : std::filesystem::directory_iterator(configDir, ec)) {
+            if (ec || !entry.is_regular_file(ec) || ec) continue;
+
+            const auto canonicalEntry = std::filesystem::weakly_canonical(entry.path(), ec);
+            if (ec) continue;
+
+            const auto dirStr = canonicalConfigDir.string();
+            const auto entryStr = canonicalEntry.string();
+            if (!entryStr.starts_with(dirStr + std::filesystem::path::preferred_separator)) continue;
+
+            const auto filename = geode::utils::string::pathToString(canonicalEntry.filename());
+            if (filename.starts_with("Simulation_") && canonicalEntry.extension() == ".txt") {
+                m_files.push_back(canonicalEntry);
             }
         }
     }
@@ -83,7 +95,16 @@ void GDWTSessionViewer::updateDisplay() {
         return;
     }
 
-    std::ifstream file(m_files[m_currentIndex]);
+    std::error_code ec;
+    const auto fileSize = std::filesystem::file_size(m_files[m_currentIndex], ec);
+    if (ec || fileSize > 1024 * 1024) {
+        m_contentLabel->setString("Error reading file.");
+        formatScrollText();
+        m_pageLabel->setString(fmt::format("{} / {}", m_currentIndex + 1, (int)m_files.size()).c_str());
+        return;
+    }
+
+    std::ifstream file(m_files[m_currentIndex], std::ios::in);
     if (file.is_open()) {
         std::stringstream buffer;
         buffer << file.rdbuf();
