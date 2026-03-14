@@ -9,6 +9,10 @@
 
 using namespace geode::prelude;
 
+namespace {
+    constexpr uintmax_t MAX_SESSION_FILE_SIZE = 1024 * 1024;
+}
+
 bool GDWTSessionViewer::init() {
     if (!Popup::init(380.f, 260.f)) return false;
     this->setTitle("Simulation History");
@@ -68,14 +72,15 @@ void GDWTSessionViewer::loadFiles() {
 
     if (std::filesystem::exists(configDir, ec) && !ec) {
         for (const auto& entry : std::filesystem::directory_iterator(configDir, ec)) {
-            if (ec || !entry.is_regular_file(ec) || ec) continue;
+            if (!entry.is_regular_file(ec) || ec) continue;
 
             const auto canonicalEntry = std::filesystem::weakly_canonical(entry.path(), ec);
             if (ec) continue;
 
-            const auto dirStr = canonicalConfigDir.string();
-            const auto entryStr = canonicalEntry.string();
-            if (!entryStr.starts_with(dirStr + std::filesystem::path::preferred_separator)) continue;
+            const auto relativePath = std::filesystem::relative(canonicalEntry, canonicalConfigDir, ec);
+            if (ec || relativePath.empty() || relativePath.is_absolute()) continue;
+            // Defense in depth: reject any path that still points outside the level config directory.
+            if (relativePath.string().starts_with("..")) continue;
 
             const auto filename = geode::utils::string::pathToString(canonicalEntry.filename());
             if (filename.starts_with("Simulation_") && canonicalEntry.extension() == ".txt") {
@@ -97,7 +102,7 @@ void GDWTSessionViewer::updateDisplay() {
 
     std::error_code ec;
     const auto fileSize = std::filesystem::file_size(m_files[m_currentIndex], ec);
-    if (ec || fileSize > 1024 * 1024) {
+    if (ec || fileSize > MAX_SESSION_FILE_SIZE) {
         m_contentLabel->setString("Error reading file.");
         formatScrollText();
         m_pageLabel->setString(fmt::format("{} / {}", m_currentIndex + 1, (int)m_files.size()).c_str());

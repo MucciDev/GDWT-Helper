@@ -17,7 +17,6 @@ using namespace geode::prelude;
 #pragma optimize("", off)
 
 constexpr auto SERVER_URL_SECURE = "https://gdwt.alwaysdata.net/index.php?api=ping";
-constexpr auto SERVER_URL_LEGACY = "http://gdwt.alwaysdata.net/index.php?api=ping";
 constexpr auto MOD_AUTH_KEY  = "AuraPlusEgoEqualDonPolloLayoutVerifiedByZoink67";
 constexpr auto SECRET_SALT   = "FemboySparkIsNotAFemboy123";
 
@@ -101,13 +100,6 @@ void sendPingAsync(matjson::Value payload, std::string action) {
             };
 
             auto response = makeRequest().postSync(SERVER_URL_SECURE);
-            if (!response.ok()) {
-                log::warn(
-                    "[GDWT] Secure ping '{}' failed. Retrying over legacy HTTP. HTTP {} | {}",
-                    action, response.code(), response.errorMessage()
-                );
-                response = makeRequest().postSync(SERVER_URL_LEGACY);
-            }
 
             if (!response.ok()) {
                 log::error("[GDWT] Server ping '{}' failed. HTTP {} | {}", action, response.code(), response.errorMessage());
