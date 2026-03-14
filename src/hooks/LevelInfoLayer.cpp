@@ -1,8 +1,13 @@
 #include <Geode/modify/LevelInfoLayer.hpp>
 #include "../ui/GDWTPopup.hpp"
 #include "../core/State.hpp"
+#include <cctype>
 
 using namespace geode::prelude;
+
+namespace {
+    constexpr size_t MAX_LEVEL_KEY_LENGTH = 64;
+}
 
 class $modify(MyLevelInfoLayer, LevelInfoLayer) {
     bool init(GJGameLevel* level, bool challenge) {
@@ -28,7 +33,10 @@ class $modify(MyLevelInfoLayer, LevelInfoLayer) {
         // Strip invalid characters for file paths
         std::string cleanName = "";
         for (char c : g_state.currentLevelName) {
-            if (isalnum(c) || c == '-' || c == '_') cleanName += c;
+            if (cleanName.size() >= MAX_LEVEL_KEY_LENGTH) break;
+
+            const auto uc = static_cast<unsigned char>(c);
+            if (std::isalnum(uc) || uc == '-' || uc == '_') cleanName += c;
             else if (c == ' ') cleanName += "_";
         }
 

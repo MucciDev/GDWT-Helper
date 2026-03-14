@@ -9,6 +9,10 @@
 
 using namespace geode::prelude;
 
+namespace {
+    constexpr uintmax_t MAX_SESSION_FILE_SIZE = 1024 * 1024;
+}
+
 bool GDWTSessionViewer::init() {
     if (!Popup::init(380.f, 260.f)) return false;
     this->setTitle("Simulation History");
@@ -62,12 +66,25 @@ bool GDWTSessionViewer::init() {
 
 void GDWTSessionViewer::loadFiles() {
     const auto configDir = geode::Mod::get()->getConfigDir() / g_state.currentLevelKey;
+    std::error_code ec;
+    const auto canonicalConfigDir = std::filesystem::weakly_canonical(configDir, ec);
+    if (ec) return;
 
-    if (std::filesystem::exists(configDir)) {
-        for (const auto& entry : std::filesystem::directory_iterator(configDir)) {
-            std::string filename = geode::utils::string::pathToString(entry.path().filename());
-            if (filename.find("Simulation_") != std::string::npos) {        
-                m_files.push_back(entry.path());
+    if (std::filesystem::exists(configDir, ec) && !ec) {
+        for (const auto& entry : std::filesystem::directory_iterator(configDir, ec)) {
+            if (!entry.is_regular_file(ec) || ec) continue;
+
+            const auto canonicalEntry = std::filesystem::weakly_canonical(entry.path(), ec);
+            if (ec) continue;
+
+            const auto relativePath = std::filesystem::relative(canonicalEntry, canonicalConfigDir, ec);
+            if (ec || relativePath.empty() || relativePath.is_absolute()) continue;
+            // Defense in depth: reject any path that still points outside the level config directory.
+            if (relativePath.string().starts_with("..")) continue;
+
+            const auto filename = geode::utils::string::pathToString(canonicalEntry.filename());
+            if (filename.starts_with("Simulation_") && canonicalEntry.extension() == ".txt") {
+                m_files.push_back(canonicalEntry);
             }
         }
     }
@@ -83,7 +100,16 @@ void GDWTSessionViewer::updateDisplay() {
         return;
     }
 
-    std::ifstream file(m_files[m_currentIndex]);
+    std::error_code ec;
+    const auto fileSize = std::filesystem::file_size(m_files[m_currentIndex], ec);
+    if (ec || fileSize > MAX_SESSION_FILE_SIZE) {
+        m_contentLabel->setString("Error reading file.");
+        formatScrollText();
+        m_pageLabel->setString(fmt::format("{} / {}", m_currentIndex + 1, (int)m_files.size()).c_str());
+        return;
+    }
+
+    std::ifstream file(m_files[m_currentIndex], std::ios::in);
     if (file.is_open()) {
         std::stringstream buffer;
         buffer << file.rdbuf();
