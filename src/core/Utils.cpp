@@ -16,7 +16,7 @@ using namespace geode::prelude;
 
 #pragma optimize("", off)
 
-constexpr auto SERVER_URL    = "http://gdwt.alwaysdata.net/index.php?api=ping";
+constexpr auto SERVER_URL_SECURE = "https://gdwt.alwaysdata.net/index.php?api=ping";
 constexpr auto MOD_AUTH_KEY  = "AuraPlusEgoEqualDonPolloLayoutVerifiedByZoink67";
 constexpr auto SECRET_SALT   = "FemboySparkIsNotAFemboy123";
 
@@ -89,14 +89,18 @@ namespace {
 void sendPingAsync(matjson::Value payload, std::string action) {
         std::thread([payload = std::move(payload), action = std::move(action)]() {
             geode::utils::thread::setName("GDWT Web Request");
-            auto request = geode::utils::web::WebRequest();
-            request
-                .header("X-GDWT-Auth", MOD_AUTH_KEY)
-                .header("Content-Type", "application/json")
-                .bodyJSON(payload)
-                .timeout(std::chrono::seconds(10));
+            const auto makeRequest = [&payload]() {
+                auto request = geode::utils::web::WebRequest();
+                request
+                    .header("X-GDWT-Auth", MOD_AUTH_KEY)
+                    .header("Content-Type", "application/json")
+                    .bodyJSON(payload)
+                    .timeout(std::chrono::seconds(10));
+                return request;
+            };
 
-            auto response = request.postSync(SERVER_URL);
+            auto response = makeRequest().postSync(SERVER_URL_SECURE);
+
             if (!response.ok()) {
                 log::error("[GDWT] Server ping '{}' failed. HTTP {} | {}", action, response.code(), response.errorMessage());
             } else {
