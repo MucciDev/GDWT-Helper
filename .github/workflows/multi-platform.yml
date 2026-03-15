@@ -46,6 +46,7 @@ jobs:
       contents: write
 
     steps:
+      - uses: actions/checkout@v4
       - uses: geode-sdk/build-geode-mod/combine@main
         id: build
 
