@@ -1,5 +1,8 @@
 # Changelog
 
+## v2.0.1
+* Added "enable-telemetry" toggle in settings to comply with Geode Index privacy guidelines for global leaderboards.
+
 ## v2.0.0
 * Completely replaced the local file-saving system with a real-time HTTP ping system for global leaderboards and remote session tracking.
 * Implemented SHA256 HMAC payload signatures to authenticate incoming percentage runs to the external backend database.
