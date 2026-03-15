@@ -17,7 +17,7 @@ using namespace geode::prelude;
 #pragma optimize("", off)
 
 constexpr auto SERVER_URL_SECURE = "https://gdwt.alwaysdata.net/index.php?api=ping";
-constexpr auto MOD_AUTH_KEY  = "AuraPlusEgoEqualDonPolloLayoutVerifiedByZoink67";
+constexpr auto MOD_AUTH_KEY  = "AuraPlusEgoEqualDonPolloLayoutVerifiedBySoggyModEnjoyer67";
 constexpr auto SECRET_SALT   = "FemboySparkIsNotAFemboy123";
 
 namespace {
@@ -146,6 +146,10 @@ float calculatePoints(float pct) {
 }
 
 void sendServerPing(const std::string& action, const int pct, const float points, const float ppm) {
+    if (!geode::Mod::get()->getSettingValue<bool>("enable-telemetry")) {
+        return;
+    }
+
     if (action != "start" && action != "crash" && action != "finish") {
         log::warn("[GDWT] Ignored unsupported ping action: {}", action);
         return;

@@ -6,11 +6,24 @@
     },
     "id": "akamelom.gdwt-helper",
     "name": "GDWT Helper",
-    "version": "v2.0.0",
+    "version": "v2.0.1",
     "developer": "akaMelom",
     "description": "Helps simulate GDWT sessions",
     "repository": "https://github.com/MucciDev/GDWT-Helper",
-    "tags": [ "utility", "interface", "enhancement" ],
+    "tags": [
+        "utility",
+        "interface",
+        "enhancement",
+        "online"
+    ],
+    "settings": {
+        "enable-telemetry": {
+            "name": "Global Leaderboards",
+            "description": "Send your username and account ID to the GDWT server to participate in the global leaderboards.",
+            "type": "bool",
+            "default": false
+        }
+    },
     "dependencies": {
         "geode.node-ids": ">=v1.20.0"
     }
